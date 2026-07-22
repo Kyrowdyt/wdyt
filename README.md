@@ -29,12 +29,6 @@ code you are reading here is byte-for-byte the code running on wdyt.live.
 The complete database rules are public too: see [`supabase.sql`](supabase.sql).
 
 
-## Stack
-
-Static HTML/CSS/JS (no build step) · [Supabase](https://supabase.com)
-(Postgres + Realtime) · GitHub Pages.
-
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
