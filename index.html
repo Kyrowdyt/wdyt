@@ -366,12 +366,11 @@
   <section class="polls" id="polls" aria-label="Community polls"></section>
 </main>
 
-<div class="cookies" id="cookieBanner" role="dialog" aria-live="polite" aria-label="Cookie consent">
-  <h3>Cookies &amp; local storage</h3>
-  <p>We use local storage to remember your votes on this device, so the polls stay answered when you come back. Nothing is tracked or shared.</p>
+<div class="cookies" id="cookieBanner" role="dialog" aria-live="polite" aria-label="Storage notice">
+  <h3>Zero tracking</h3>
+  <p>This site stores one thing in your browser: a random, anonymous ballot id. It's strictly necessary for the poll to work — it remembers your vote and keeps it to one vote per person. No tracking, no ads, no third parties.</p>
   <div class="row">
-    <button class="accept" id="cookieAccept">Accept</button>
-    <button class="decline" id="cookieDecline">Decline</button>
+    <button class="accept" id="noticeOk">Got it</button>
   </div>
 </div>
 
@@ -387,8 +386,8 @@
      but counts only exist in your own browser.
      ============================================================ */
   var CONFIG = {
-    SUPABASE_URL:      "https://aoawsihkdonrwfkgcmyk.supabase.co",
-    SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvYXdzaWhrZG9ucndma2djbXlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTU1NDIsImV4cCI6MjEwMDI5MTU0Mn0.vZeQs1EpQUpkCHFSl0Zw1fWU8z1XeB4uEKpLS2Fo1-w"
+    SUPABASE_URL:      "PASTE_SUPABASE_URL_HERE",
+    SUPABASE_ANON_KEY: "PASTE_SUPABASE_ANON_KEY_HERE"
   };
 
   var CHANGE_LOCK_MS = 15 * 1000;   // vote can be changed after 15 seconds
@@ -468,20 +467,17 @@
   }
 
   /* ---------- Safe storage (never crashes if blocked) ---------- */
-  var LS_VOTES   = "wdyt_votes";
-  var LS_CONSENT = "wdyt_consent";
-  var LS_VOTER   = "wdyt_voter";
+  var LS_VOTES  = "wdyt_votes";
+  var LS_NOTICE = "wdyt_notice";
+  var LS_VOTER  = "wdyt_voter";
 
   var memory = {};
   function lsGet(k){ try{ return window.localStorage.getItem(k); }catch(e){ return memory[k] || null; } }
   function lsSet(k,v){ try{ window.localStorage.setItem(k,v); }catch(e){ memory[k]=v; } }
-  function ssGet(k){ try{ return window.sessionStorage.getItem(k); }catch(e){ return memory["s_"+k] || null; } }
-  function ssSet(k,v){ try{ window.sessionStorage.setItem(k,v); }catch(e){ memory["s_"+k]=v; } }
 
-  var consent = lsGet(LS_CONSENT) === "accepted" ? "accepted"
-              : (ssGet(LS_CONSENT) === "declined" ? "declined" : null);
-
-  /* ---------- Anonymous voter id (random, no personal data) ---------- */
+  /* ---------- Anonymous voter id (random, no personal data) ----------
+     Stored always: it is strictly necessary for the poll to function
+     (remembers your ballot, enforces one vote per person). */
   function makeUuid(){
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c){
@@ -493,7 +489,7 @@
     var v = lsGet(LS_VOTER);
     if (v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return v;
     v = makeUuid();
-    if (consent === "accepted") lsSet(LS_VOTER, v);
+    lsSet(LS_VOTER, v);
     return v;
   })();
 
@@ -516,7 +512,7 @@
 
   /* ---------- My votes: { pollId: { v:"yes"|"no"|..., t:<ms> } } ---------- */
   var votes = {};
-  if (consent === "accepted"){
+  (function(){
     try{
       var raw = JSON.parse(lsGet(LS_VOTES) || "{}") || {};
       Object.keys(raw).forEach(function(k){
@@ -524,9 +520,9 @@
         else if (raw[k] && raw[k].v)    votes[k] = raw[k];
       });
     }catch(e){ votes = {}; }
-  }
+  })();
   function saveVotes(){
-    if (consent === "accepted") lsSet(LS_VOTES, JSON.stringify(votes));
+    lsSet(LS_VOTES, JSON.stringify(votes));
   }
 
   /* ---------- Live counts: { pollId: { choiceKey: int } } ---------- */
@@ -724,12 +720,14 @@
   }
   function renderAllCounts(){ POLLS.forEach(renderCounts); }
 
-  /* ---------- Casting a vote (optimistic UI + server sync) ---------- */
+  /* ---------- Casting a vote (optimistic UI + server sync) ----------
+     choice "none" = withdrawn ballot: the row stays (votes are never
+     deleted) but it is excluded from all counts until re-cast. */
   function castVote(p, pollId, choice){
     var prev = votes[pollId] ? votes[pollId].v : null;
     if (prev === choice){ votes[pollId].t = votes[pollId].t || Date.now(); return; }
-    if (prev) bump(pollId, prev, -1);
-    bump(pollId, choice, +1);
+    if (prev && prev !== "none") bump(pollId, prev, -1);
+    if (choice !== "none") bump(pollId, choice, +1);
     votes[pollId] = { v: choice, t: Date.now() };
     saveVotes();
     if (pollId === p.id) renderCounts(p);
@@ -812,7 +810,7 @@
   /* ---------- Results ---------- */
   function showResults(p, card, animate){
     var my = votes[p.id];
-    if (!my) return;
+    if (!my || my.v === "none") return;
     var yes = countFor(p.id, "yes");
     var no  = countFor(p.id, "no");
     var total = yes + no;
@@ -853,7 +851,7 @@
     var open = !!my && my.v === "yes";
     var wasOpen = card.classList.contains("sub-open");
     card.classList.toggle("sub-open", open);
-    if (open && votes[p.sub.id]) showSub(p, card, false);
+    if (open && votes[p.sub.id] && votes[p.sub.id].v !== "none") showSub(p, card, false);
 
     if (open && !wasOpen && animate){
       var subEl = card.querySelector(".subpoll");
@@ -868,7 +866,7 @@
   function showSub(p, card, animate){
     var sub = p.sub;
     var my = votes[sub.id];
-    if (!my) return;
+    if (!my || my.v === "none") return;
     var subEl = card.querySelector(".subpoll");
     subEl.classList.add("sub-voted");
 
@@ -911,6 +909,7 @@
     } else {
       slot.innerHTML = '<button class="change" type="button">Change vote</button>';
       slot.querySelector(".change").addEventListener("click", function(){
+        castVote(p, p.sub.id, "none");   // withdraw: not counted until re-voted
         subEl.classList.remove("sub-voted");
       });
     }
@@ -938,6 +937,7 @@
     } else {
       slot.innerHTML = '<button class="change" type="button">Change vote</button>';
       slot.querySelector(".change").addEventListener("click", function(){
+        castVote(p, p.id, "none");   // withdraw: not counted until re-voted
         card.classList.remove("voted");
       });
     }
@@ -965,20 +965,13 @@
     });
   }, 1000);
 
-  /* ---------- Cookie banner ---------- */
+  /* ---------- Storage notice (informational — no opt-out needed for
+       strictly necessary storage; shown once until dismissed) ---------- */
   var banner = document.getElementById("cookieBanner");
-  if (!consent) banner.classList.add("show");
+  if (lsGet(LS_NOTICE) !== "1") banner.classList.add("show");
 
-  document.getElementById("cookieAccept").addEventListener("click", function(){
-    consent = "accepted";
-    lsSet(LS_CONSENT, "accepted");
-    lsSet(LS_VOTER, voterId);
-    saveVotes();
-    banner.classList.remove("show");
-  });
-  document.getElementById("cookieDecline").addEventListener("click", function(){
-    consent = "declined";
-    ssSet(LS_CONSENT, "declined"); // remembered for this session only
+  document.getElementById("noticeOk").addEventListener("click", function(){
+    lsSet(LS_NOTICE, "1");
     banner.classList.remove("show");
   });
 })();
