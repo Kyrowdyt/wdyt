@@ -374,6 +374,7 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -385,10 +386,14 @@
      Until you do, the page runs in "local demo" mode: voting works
      but counts only exist in your own browser.
      ============================================================ */
-  var CONFIG = {
-    SUPABASE_URL:      "PASTE_SUPABASE_URL_HERE",
-    SUPABASE_ANON_KEY: "PASTE_SUPABASE_ANON_KEY_HERE"
-  };
+  /* Keys live in config.js (never overwritten by site updates).
+     The inline placeholders below are only a fallback. */
+  var CONFIG = (window.WDYT_CONFIG && window.WDYT_CONFIG.SUPABASE_URL)
+    ? window.WDYT_CONFIG
+    : {
+        SUPABASE_URL:      "PASTE_SUPABASE_URL_HERE",
+        SUPABASE_ANON_KEY: "PASTE_SUPABASE_ANON_KEY_HERE"
+      };
 
   var CHANGE_LOCK_MS = 15 * 1000;   // vote can be changed after 15 seconds
 
