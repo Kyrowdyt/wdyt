@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What do you think?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Center of the "Earth" glow, in vh so the parallax buffer below the
+       screen doesn't change the look. Over 100vh pushes the sphere below
+       the screen edge, so only its glowing rim shows at the bottom. */
+    --glow-x: 50%;
+    --glow-y: 118vh;
+
+    --ink:        #EAF2FA;
+    --ink-dim:    #8A97AB;
+    --sky:        #8FD6FF;   /* błękit — heading */
+    --sky-deep:   #4FB4F0;
+    --yes:        #35E0C8;
+    --no:         #FF7A9C;
+    --alt:        #B48FFF;   /* violet — ASTROID side of the sub-poll */
+    --space:      #04060C;
+    --glass:      rgba(10, 16, 28, .55);
+    --glass-edge: rgba(143, 214, 255, .16);
+    --thumb: 84px;           /* every thumbnail — identical size */
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+
+  body{
+    font-family:'Space Grotesk', system-ui, sans-serif;
+    background:var(--space);
+    color:var(--ink);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* ---------- Background: Earth glow below the screen + star field ----------
+     Both layers are 180px taller than the viewport so the scroll parallax
+     can shift them upward without ever exposing a gap at the bottom. */
+  .bg{
+    position:fixed; top:0; left:0; right:0; height:calc(100% + 180px); z-index:-2;
+    will-change:transform;
+    background:
+      radial-gradient(120% 55vh at var(--glow-x) var(--glow-y), rgba(79,180,240,.55) 0%, rgba(53,224,200,.28) 32%, rgba(4,6,12,0) 62%),
+      radial-gradient(90% 30vh at var(--glow-x) calc(var(--glow-y) - 14vh), rgba(234,242,250,.35) 0%, rgba(4,6,12,0) 55%),
+      var(--space);
+  }
+  #stars{
+    position:fixed; top:0; left:0; right:0; height:calc(100% + 180px); z-index:-1;
+    width:100%;
+    will-change:transform;
+    pointer-events:none;
+  }
+
+  /* ---------- Layout: two modes ----------
+     Default (1-3 polls): the early-version layout — heading centered in the
+     normal page flow with a roomy top margin, polls flowing below it.
+     body.pinned (4+ polls, set by JS from POLLS.length): heading fixed to
+     the top, content offset by --hero-h, frosted blur veil active.        */
+  .wrap{
+    max-width:1200px; margin:0 auto;
+    padding:clamp(24px, 5vw, 64px);
+    display:flex; flex-direction:column; align-items:center;
+  }
+  body.pinned .wrap{
+    /* room for the fixed heading; --hero-h is measured by JS */
+    padding-top:calc(var(--hero-h, 180px) + 44px);
+  }
+
+  .hero{
+    margin:clamp(48px, 12vh, 140px) auto 0;
+    width:min(640px, 100%);
+    text-align:center;
+  }
+  body.pinned .hero{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    margin:0; width:auto;
+    padding:clamp(14px, 3.5vh, 36px) 20px 12px;
+    pointer-events:none;
+  }
+  .hero h1{
+    font-family:'Unbounded', sans-serif;
+    font-weight:700;
+    font-size:clamp(2rem, 4.6vw, 3.6rem);
+    line-height:1.12;
+    letter-spacing:-.01em;
+    color:var(--sky);
+    text-shadow:0 0 28px rgba(143,214,255,.45), 0 0 90px rgba(79,180,240,.25);
+  }
+  .hero p{
+    margin-top:14px;
+    color:var(--ink-dim);
+    font-size:1.02rem;
+  }
+  body.pinned .hero p{ margin-top:10px; }
+
+  /* Frosted veil behind the heading: polls scrolling into this zone blur out.
+     Four stacked backdrop layers with staggered masks build a PROGRESSIVE blur:
+     barely visible at the veil's lower edge, ramping up smoothly, and at full
+     strength right on the "What do you think?" line at the top.
+     Active only in pinned mode (4+ polls). */
+  .hero-veil{
+    display:none;
+    position:fixed; top:0; left:0; right:0; z-index:5;
+    height:calc(var(--hero-h, 180px) + 72px);
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(4,6,12,.88) 0%, rgba(4,6,12,.45) 55%, rgba(4,6,12,0) 100%);
+  }
+  body.pinned .hero-veil{ display:block; }
+  .hero-veil i{ position:absolute; inset:0; display:block; }
+  .hero-veil .v1{
+    backdrop-filter:blur(2px);  -webkit-backdrop-filter:blur(2px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 55%, transparent 97%);
+            mask-image:linear-gradient(to bottom, #000 0%, #000 55%, transparent 97%);
+  }
+  .hero-veil .v2{
+    backdrop-filter:blur(4px);  -webkit-backdrop-filter:blur(4px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 42%, transparent 80%);
+            mask-image:linear-gradient(to bottom, #000 0%, #000 42%, transparent 80%);
+  }
+  .hero-veil .v3{
+    backdrop-filter:blur(8px);  -webkit-backdrop-filter:blur(8px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 28%, transparent 60%);
+            mask-image:linear-gradient(to bottom, #000 0%, #000 28%, transparent 60%);
+  }
+  .hero-veil .v4{
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 15%, transparent 42%);
+            mask-image:linear-gradient(to bottom, #000 0%, #000 15%, transparent 42%);
+  }
+
+  /* ---------- Polls ---------- */
+  .polls{
+    width:min(640px, 100%);
+    margin-top:clamp(28px, 5vh, 56px);
+    margin-bottom:120px;
+    display:flex; flex-direction:column; gap:30px;
+  }
+  body.pinned .polls{ margin-top:0; }
+
+  .poll{
+    background:var(--glass);
+    border:1px solid var(--glass-edge);
+    border-radius:20px;
+    padding:18px;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    transition:border-color .25s ease;
+  }
+  .poll:hover{ border-color:rgba(143,214,255,.34); }
+
+  .poll-top{ display:flex; gap:16px; align-items:center; text-align:left; }
+
+  .thumb{
+    width:var(--thumb); height:var(--thumb); flex:0 0 var(--thumb);
+    border-radius:16px; overflow:hidden;
+    border:1px solid rgba(234,242,250,.14);
+    background:#0B1220;
+  }
+  .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .q{ flex:1; min-width:0; }
+  .q h2{
+    font-size:clamp(1rem, 2.2vw, 1.15rem);
+    font-weight:500; line-height:1.35;
+  }
+
+  /* Live vote counters next to the question */
+  .counts{ display:flex; flex-direction:column; gap:5px; align-items:flex-end; margin-left:4px; }
+  .counts span{
+    font-size:.74rem; font-weight:700; letter-spacing:.05em;
+    padding:4px 9px; border-radius:99px; white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+    border:1px solid;
+  }
+  .c-yes{ color:var(--yes); border-color:rgba(53,224,200,.35); background:rgba(53,224,200,.08); }
+  .c-no { color:var(--no);  border-color:rgba(255,122,156,.35); background:rgba(255,122,156,.08); }
+  .counts span.tick{ animation:countTick .45s ease; }
+  @keyframes countTick{ 30%{ transform:scale(1.16); } }
+
+  .choices{ display:flex; gap:10px; margin-top:14px; }
+  .btn{
+    flex:1;
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:.95rem;
+    letter-spacing:.04em;
+    padding:11px 0;
+    border-radius:12px;
+    border:1px solid rgba(234,242,250,.18);
+    background:rgba(234,242,250,.05);
+    color:var(--ink);
+    cursor:pointer;
+    transition:background .2s ease, border-color .2s ease, transform .12s ease;
+  }
+  .btn:hover{ transform:translateY(-1px); }
+  .btn:focus-visible{ outline:2px solid var(--sky); outline-offset:2px; }
+  .btn.yes:hover{ background:rgba(53,224,200,.14); border-color:rgba(53,224,200,.5); }
+  .btn.no:hover{ background:rgba(255,122,156,.12); border-color:rgba(255,122,156,.5); }
+
+  /* ---------- Results: the "horizon meter" ---------- */
+  .results{ margin-top:14px; display:none; }
+  .poll.voted .results{ display:block; }
+  .poll.voted > .choices{ display:none; }
+
+  .meter{
+    position:relative; height:10px; border-radius:99px;
+    background:rgba(234,242,250,.08); overflow:hidden;
+  }
+  .meter .fill-yes, .meter .fill-no{
+    position:absolute; top:0; bottom:0; width:0%;
+    transition:width .8s cubic-bezier(.22,1,.36,1);
+  }
+  .fill-yes{ left:0; background:linear-gradient(90deg, rgba(53,224,200,.35), var(--yes)); box-shadow:0 0 14px rgba(53,224,200,.55); }
+  .fill-no { right:0; background:linear-gradient(270deg, rgba(255,122,156,.35), var(--no)); box-shadow:0 0 14px rgba(255,122,156,.5); }
+  .meter .spark{
+    position:absolute; top:50%; width:4px; height:18px;
+    transform:translate(-50%,-50%);
+    background:#fff; border-radius:99px;
+    box-shadow:0 0 12px #fff, 0 0 26px var(--sky);
+    transition:left .8s cubic-bezier(.22,1,.36,1);
+  }
+
+  .stats{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-top:9px; font-size:.92rem;
+  }
+  .stats .pct-yes{ color:var(--yes); font-weight:700; }
+  .stats .pct-no { color:var(--no);  font-weight:700; }
+  .meta{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:7px; font-size:.8rem; color:var(--ink-dim); gap:10px;
+  }
+  .meta .my-vote strong{ color:var(--ink); }
+  .change{
+    background:none; border:none; color:var(--sky-deep);
+    font:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+  }
+  .change:focus-visible{ outline:2px solid var(--sky); outline-offset:2px; border-radius:4px; }
+  .lock{
+    color:var(--ink-dim);
+    font-variant-numeric:tabular-nums;
+  }
+  .lock::before{ content:"🔒 "; font-size:.75em; }
+
+  /* ---------- Vote click burst: glow ring + star sparks at the tap point ---------- */
+  .burst{ position:fixed; z-index:60; pointer-events:none; transform:translate(-50%,-50%); }
+  .burst i{ display:block; position:absolute; left:0; top:0; }
+  .burst .ring{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--burst-c);
+    box-shadow:0 0 14px var(--burst-c);
+    transform:translate(-50%,-50%) scale(.4);
+    animation:burstRing .55s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  @keyframes burstRing{
+    from{ opacity:.95; transform:translate(-50%,-50%) scale(.4); }
+    to  { opacity:0;   transform:translate(-50%,-50%) scale(4.4); }
+  }
+  .burst .pt{
+    width:4px; height:4px; border-radius:50%;
+    background:#fff;
+    box-shadow:0 0 8px var(--burst-c), 0 0 3px #fff;
+    transform:translate(-50%,-50%);
+    opacity:0;
+    animation:burstPt .6s ease-out forwards;
+  }
+  @keyframes burstPt{
+    0%  { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    100%{ opacity:0; transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.35); }
+  }
+
+  /* ---------- Nested sub-poll (shown after a YES on $asteroid) ---------- */
+  .subpoll{
+    display:none;
+    position:relative;
+    margin:16px -12px 0;
+    padding:14px 12px 2px;
+    border-top:1px dashed rgba(234,242,250,.14);
+    border-radius:14px;
+    text-align:left;
+  }
+  .poll.voted.sub-open .subpoll{ display:block; animation:subIn .45s cubic-bezier(.22,1,.36,1); }
+  /* flash: glow pulse + light sweep, triggered only when the sub-poll newly appears */
+  .poll.voted.sub-open .subpoll.flash{
+    overflow:hidden;
+    animation:subIn .45s cubic-bezier(.22,1,.36,1), subGlow 1.6s ease-out;
+  }
+  @keyframes subIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  @keyframes subGlow{
+    0%   { background:rgba(143,214,255,0);    box-shadow:0 0 0 0 rgba(143,214,255,0); }
+    30%  { background:rgba(143,214,255,.08);  box-shadow:0 0 26px rgba(143,214,255,.38), inset 0 0 22px rgba(143,214,255,.14); }
+    100% { background:rgba(143,214,255,0);    box-shadow:0 0 0 0 rgba(143,214,255,0); }
+  }
+  .sheen{
+    position:absolute; top:0; bottom:0; left:-45%; width:36%;
+    background:linear-gradient(105deg, transparent, rgba(234,242,250,.22) 35%, rgba(143,214,255,.5) 50%, rgba(234,242,250,.22) 65%, transparent);
+    filter:blur(1px);
+    opacity:0; pointer-events:none;
+  }
+  .subpoll.flash .sheen{ animation:sweep 1s cubic-bezier(.4,0,.2,1) .15s forwards; }
+  @keyframes sweep{ 0%{ opacity:1; left:-45%; } 100%{ opacity:0; left:115%; } }
+  .sub-q{ font-size:.92rem; font-weight:500; }
+  .sub-choices{ margin-top:11px; }
+  .sub-choices .btn{ padding:8px 0; font-size:.82rem; border-radius:10px; }
+  .sub-choices .btn:hover{ background:rgba(143,214,255,.1); border-color:rgba(143,214,255,.45); }
+  .sub-results{ display:none; margin-top:12px; }
+  .subpoll.sub-voted .sub-results{ display:block; }
+  .subpoll.sub-voted .sub-choices{ display:none; }
+  .sub-meter{ height:7px; }
+  .sub-meter .spark{ width:3px; height:14px; }
+  .fill-a{ position:absolute; top:0; bottom:0; left:0;  width:0%; background:linear-gradient(90deg, rgba(143,214,255,.35), var(--sky));  box-shadow:0 0 12px rgba(143,214,255,.55); transition:width .8s cubic-bezier(.22,1,.36,1); }
+  .fill-b{ position:absolute; top:0; bottom:0; right:0; width:0%; background:linear-gradient(270deg, rgba(180,143,255,.35), var(--alt)); box-shadow:0 0 12px rgba(180,143,255,.5);  transition:width .8s cubic-bezier(.22,1,.36,1); }
+  .sub-stats{ font-size:.82rem; }
+  .sub-stats .pct-a{ color:var(--sky); font-weight:700; }
+  .sub-stats .pct-b{ color:var(--alt); font-weight:700; }
+  .subpoll .meta{ font-size:.76rem; }
+
+  /* ---------- Cookie banner ---------- */
+  .cookies{
+    position:fixed; left:20px; right:20px; bottom:20px; z-index:50;
+    max-width:460px; margin-inline:auto;
+    background:rgba(8, 13, 24, .92);
+    border:1px solid var(--glass-edge);
+    border-radius:18px;
+    padding:18px 20px;
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+    display:none;
+  }
+  .cookies.show{ display:block; animation:rise .45s cubic-bezier(.22,1,.36,1); }
+  @keyframes rise{ from{ transform:translateY(24px); opacity:0; } to{ transform:none; opacity:1; } }
+  .cookies h3{ font-size:1rem; font-weight:700; color:var(--sky); }
+  .cookies p{ margin-top:6px; font-size:.86rem; line-height:1.5; color:var(--ink-dim); }
+  .cookies .row{ display:flex; gap:10px; margin-top:14px; }
+  .cookies .accept{
+    flex:1; border:none; border-radius:11px; padding:10px 0;
+    font:700 .9rem 'Space Grotesk', sans-serif; letter-spacing:.03em;
+    background:linear-gradient(135deg, var(--sky-deep), var(--sky));
+    color:#04121F; cursor:pointer;
+  }
+  .cookies .decline{
+    flex:1; border-radius:11px; padding:10px 0;
+    font:500 .9rem 'Space Grotesk', sans-serif;
+    background:none; border:1px solid rgba(234,242,250,.2);
+    color:var(--ink-dim); cursor:pointer;
+  }
+  .cookies button:focus-visible{ outline:2px solid var(--sky); outline-offset:2px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:720px){
+    :root{ --thumb:64px; }
+    .hero{ margin-top:9vh; }
+    body.pinned .hero{ margin-top:0; }
+    .thumb{ border-radius:13px; }
+    .counts span{ font-size:.66rem; padding:3px 7px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"></div>
+<canvas id="stars" aria-hidden="true"></canvas>
+
+<div class="hero-veil" aria-hidden="true"><i class="v1"></i><i class="v2"></i><i class="v3"></i><i class="v4"></i></div>
+<header class="hero">
+  <h1>What do you think?</h1>
+  <p>See how the rest of the world voted</p>
+</header>
+
+<main class="wrap">
+  <section class="polls" id="polls" aria-label="Community polls"></section>
+</main>
+
+<div class="cookies" id="cookieBanner" role="dialog" aria-live="polite" aria-label="Cookie consent">
+  <h3>Cookies &amp; local storage</h3>
+  <p>We use local storage to remember your votes on this device, so the polls stay answered when you come back. Nothing is tracked or shared.</p>
+  <div class="row">
+    <button class="accept" id="cookieAccept">Accept</button>
+    <button class="decline" id="cookieDecline">Decline</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     CONFIG — the ONLY two lines you need to edit.
+     Paste the values from Supabase (see INSTRUKCJA.md, step 7-8).
+     Until you do, the page runs in "local demo" mode: voting works
+     but counts only exist in your own browser.
+     ============================================================ */
+  var CONFIG = {
+    SUPABASE_URL:      "PASTE_SUPABASE_URL_HERE",
+    SUPABASE_ANON_KEY: "PASTE_SUPABASE_ANON_KEY_HERE"
+  };
+
+  var CHANGE_LOCK_MS = 15 * 1000;   // vote can be changed after 15 seconds
+
+  /* ---------- Polls ----------
+     To add a poll, append an entry here (its id becomes the key in the
+     database — never reuse an old id for a different question).
+     Optional extras:
+       img: thumbFor("$TICKER", "#light", "#deep")  -> generated thumbnail
+       sub: { id, question, a:{key,label}, b:{key,label} }
+            -> nested follow-up poll revealed after a YES vote          */
+  var POLLS = [
+    { id:"world", ticker:"$WORLD",
+      img:"data:image/jpeg;base64,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",
+      question:"Is $world an official world.xyz coin?" }
+  ];
+
+  /* Generated placeholder thumbnail: dark sky, a few stars, a glowing
+     planet rim at the bottom (matching the page), ticker in the middle. */
+  function thumbFor(ticker, cLight, cDeep){
+    var svg =
+      "<svg xmlns='http://www.w3.org/2000/svg' width='168' height='168'>" +
+        "<defs><radialGradient id='g' cx='50%' cy='100%' r='80%'>" +
+          "<stop offset='0%' stop-color='" + cLight + "'/>" +
+          "<stop offset='45%' stop-color='" + cDeep + "' stop-opacity='.55'/>" +
+          "<stop offset='100%' stop-color='#0B1220' stop-opacity='0'/>" +
+        "</radialGradient></defs>" +
+        "<rect width='168' height='168' fill='#0B1220'/>" +
+        "<circle cx='28' cy='34' r='1.6' fill='#EAF2FA' opacity='.8'/>" +
+        "<circle cx='128' cy='22' r='1.2' fill='#BEDCFF' opacity='.7'/>" +
+        "<circle cx='84' cy='52' r='1' fill='#EAF2FA' opacity='.5'/>" +
+        "<circle cx='146' cy='64' r='1.4' fill='#FFEBD7' opacity='.6'/>" +
+        "<circle cx='48' cy='70' r='.9' fill='#EAF2FA' opacity='.45'/>" +
+        "<ellipse cx='84' cy='198' rx='132' ry='86' fill='url(#g)'/>" +
+        "<text x='84' y='96' text-anchor='middle' fill='#EAF2FA' " +
+          "font-family='Arial, sans-serif' font-weight='700' font-size='25' " +
+          "letter-spacing='1'>" + ticker + "</text>" +
+      "</svg>";
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+
+  /* ---------- Layout mode: 1-3 polls -> static early layout, 4+ -> pinned ---------- */
+  document.body.classList.toggle("pinned", POLLS.length > 3);
+
+  /* ---------- Click burst on answering ---------- */
+  var motionOK = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function burstAt(ev, el, color){
+    if (!motionOK) return;
+    var x, y;
+    if (ev && (ev.clientX || ev.clientY)){ x = ev.clientX; y = ev.clientY; }
+    else { var r = el.getBoundingClientRect(); x = r.left + r.width/2; y = r.top + r.height/2; }
+
+    var b = document.createElement("div");
+    b.className = "burst";
+    b.style.left = x + "px";
+    b.style.top  = y + "px";
+    b.style.setProperty("--burst-c", color);
+
+    var ring = document.createElement("i");
+    ring.className = "ring";
+    b.appendChild(ring);
+
+    for (var i = 0; i < 7; i++){
+      var p = document.createElement("i");
+      p.className = "pt";
+      var ang  = Math.random() * Math.PI * 2;
+      var dist = 26 + Math.random() * 32;
+      p.style.setProperty("--dx", (Math.cos(ang) * dist).toFixed(1) + "px");
+      p.style.setProperty("--dy", (Math.sin(ang) * dist).toFixed(1) + "px");
+      p.style.animationDelay = Math.floor(Math.random() * 80) + "ms";
+      b.appendChild(p);
+    }
+
+    document.body.appendChild(b);
+    setTimeout(function(){ b.remove(); }, 900);
+  }
+
+  /* ---------- Safe storage (never crashes if blocked) ---------- */
+  var LS_VOTES   = "wdyt_votes";
+  var LS_CONSENT = "wdyt_consent";
+  var LS_VOTER   = "wdyt_voter";
+
+  var memory = {};
+  function lsGet(k){ try{ return window.localStorage.getItem(k); }catch(e){ return memory[k] || null; } }
+  function lsSet(k,v){ try{ window.localStorage.setItem(k,v); }catch(e){ memory[k]=v; } }
+  function ssGet(k){ try{ return window.sessionStorage.getItem(k); }catch(e){ return memory["s_"+k] || null; } }
+  function ssSet(k,v){ try{ window.sessionStorage.setItem(k,v); }catch(e){ memory["s_"+k]=v; } }
+
+  var consent = lsGet(LS_CONSENT) === "accepted" ? "accepted"
+              : (ssGet(LS_CONSENT) === "declined" ? "declined" : null);
+
+  /* ---------- Anonymous voter id (random, no personal data) ---------- */
+  function makeUuid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c){
+      var r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  var voterId = (function(){
+    var v = lsGet(LS_VOTER);
+    if (v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return v;
+    v = makeUuid();
+    if (consent === "accepted") lsSet(LS_VOTER, v);
+    return v;
+  })();
+
+  /* ---------- Backend (Supabase) ---------- */
+  var sb = null;
+  var backendOn = false;
+  (function(){
+    var okCfg = CONFIG.SUPABASE_URL.indexOf("https://") === 0 &&
+                CONFIG.SUPABASE_URL.indexOf("PASTE_") === -1 &&
+                CONFIG.SUPABASE_ANON_KEY.length > 30 &&
+                CONFIG.SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
+    if (okCfg && window.supabase && window.supabase.createClient){
+      try{
+        sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        backendOn = true;
+      }catch(e){ backendOn = false; }
+    }
+    if (!backendOn) console.info("wdyt: running in local demo mode (no Supabase keys configured)");
+  })();
+
+  /* ---------- My votes: { pollId: { v:"yes"|"no"|..., t:<ms> } } ---------- */
+  var votes = {};
+  if (consent === "accepted"){
+    try{
+      var raw = JSON.parse(lsGet(LS_VOTES) || "{}") || {};
+      Object.keys(raw).forEach(function(k){
+        if (typeof raw[k] === "string") votes[k] = { v: raw[k], t: 0 };
+        else if (raw[k] && raw[k].v)    votes[k] = raw[k];
+      });
+    }catch(e){ votes = {}; }
+  }
+  function saveVotes(){
+    if (consent === "accepted") lsSet(LS_VOTES, JSON.stringify(votes));
+  }
+
+  /* ---------- Live counts: { pollId: { choiceKey: int } } ---------- */
+  var counts = {};
+  function countFor(id, key){ return (counts[id] && counts[id][key]) || 0; }
+  function bump(id, key, delta){
+    if (!counts[id]) counts[id] = {};
+    counts[id][key] = Math.max(0, (counts[id][key] || 0) + delta);
+  }
+
+  /* ---------- Star field (fades near the glow) ---------- */
+  var PAR_BUFFER = 180;   // extra px below the viewport, must cover the max parallax shift
+  var canvas = document.getElementById("stars");
+  var ctx = canvas.getContext("2d");
+
+  function drawStars(){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var vw = Math.floor(window.innerWidth * dpr);
+    var vh = Math.floor(window.innerHeight * dpr);           // viewport height in canvas px
+    canvas.width  = vw;
+    canvas.height = Math.floor((window.innerHeight + PAR_BUFFER) * dpr);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    var cs = getComputedStyle(document.documentElement);
+    var gx = parseFloat(cs.getPropertyValue("--glow-x")) / 100;
+    var gy = parseFloat(cs.getPropertyValue("--glow-y")) / 100;   // "118vh" -> 1.18 of viewport
+    var g = { x: vw * gx, y: vh * gy };
+
+    /* The glow is a wide arc at the bottom, so the fade zone is a wide
+       ellipse: horizontal distance counts less than vertical distance. */
+    var rInner = vh * 0.30;   // fully faded this close to the glow
+    var rOuter = vh * 0.95;   // fully visible this far away
+    var count = Math.floor((canvas.width * canvas.height) / (2600 * dpr));
+
+    for (var i = 0; i < count; i++){
+      var x = Math.random() * canvas.width;
+      var y = Math.random() * canvas.height;
+
+      var d = Math.hypot((x - g.x) / 2.0, y - g.y);
+      var fade = (d - rInner) / (rOuter - rInner);
+      fade = Math.max(0, Math.min(1, fade));
+      fade = fade * fade * (3 - 2 * fade);            // smoothstep
+      if (fade <= 0.02) continue;
+
+      var r = (0.35 + Math.random() * 0.95) * dpr;
+      var a = (0.25 + Math.random() * 0.75) * fade;
+
+      if (Math.random() < 0.045){
+        r *= 1.7;
+        ctx.shadowBlur = 6 * dpr;
+        ctx.shadowColor = "rgba(180, 215, 255, " + (a * 0.9) + ")";
+      } else {
+        ctx.shadowBlur = 0;
+      }
+
+      var tint = Math.random();
+      var color = tint < 0.75 ? "255,255,255" : (tint < 0.9 ? "190,220,255" : "255,235,215");
+      ctx.fillStyle = "rgba(" + color + "," + a.toFixed(3) + ")";
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  var resizeT;
+  window.addEventListener("resize", function(){
+    clearTimeout(resizeT);
+    resizeT = setTimeout(drawStars, 150);
+  });
+  drawStars();
+
+  /* ---------- Scroll parallax: the background drifts gently with you ---------- */
+  var bgEl = document.querySelector(".bg");
+  var parPending = false;
+
+  function applyParallax(){
+    parPending = false;
+    var yv = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var glowShift = Math.min(yv * 0.06, 120);   // Earth rim: a touch faster (it's closer)
+    var starShift = Math.min(yv * 0.03, 60);    // stars: slower (they're far away)
+    bgEl.style.transform   = "translate3d(0," + (-glowShift) + "px,0)";
+    canvas.style.transform = "translate3d(0," + (-starShift) + "px,0)";
+  }
+
+  if (motionOK){
+    window.addEventListener("scroll", function(){
+      if (!parPending){
+        parPending = true;
+        requestAnimationFrame(applyParallax);
+      }
+    }, { passive:true });
+    applyParallax();
+  }
+
+  /* ---------- Hero height -> --hero-h (veil size + content offset) ---------- */
+  var heroEl = document.querySelector(".hero");
+  function setHeroH(){
+    document.documentElement.style.setProperty("--hero-h", heroEl.offsetHeight + "px");
+  }
+  setHeroH();
+  window.addEventListener("resize", setHeroH);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(setHeroH);
+  window.addEventListener("load", setHeroH);
+
+  /* ---------- Rendering ---------- */
+  var container = document.getElementById("polls");
+  var cards = {};
+
+  POLLS.forEach(function(p){
+    var card = document.createElement("article");
+    card.className = "poll";
+    card.id = "poll-" + p.id;
+
+    var subHtml = "";
+    if (p.sub){
+      subHtml =
+        '<div class="subpoll">' +
+          '<span class="sheen" aria-hidden="true"></span>' +
+          '<p class="sub-q">' + p.sub.question + '</p>' +
+          '<div class="choices sub-choices">' +
+            '<button class="btn" data-sub-vote="' + p.sub.a.key + '">' + p.sub.a.label + '</button>' +
+            '<button class="btn" data-sub-vote="' + p.sub.b.key + '">' + p.sub.b.label + '</button>' +
+          '</div>' +
+          '<div class="sub-results">' +
+            '<div class="meter sub-meter">' +
+              '<div class="fill-a"></div><div class="fill-b"></div><div class="spark"></div>' +
+            '</div>' +
+            '<div class="stats sub-stats">' +
+              '<span class="pct-a"></span><span class="pct-b"></span>' +
+            '</div>' +
+            '<div class="meta">' +
+              '<span class="sub-my"></span>' +
+              '<span><span class="sub-total"></span> · <span class="sub-change-slot"></span></span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    card.innerHTML =
+      '<div class="poll-top">' +
+        '<div class="thumb">' +
+          '<img src="' + p.img + '" alt="' + p.ticker + ' thumbnail">' +
+        '</div>' +
+        '<div class="q"><h2>' + p.question + '</h2></div>' +
+        '<div class="counts">' +
+          '<span class="c-yes">YES <b>0</b></span>' +
+          '<span class="c-no">NO <b>0</b></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="choices">' +
+        '<button class="btn yes" data-vote="yes">YES</button>' +
+        '<button class="btn no"  data-vote="no">NO</button>' +
+      '</div>' +
+      '<div class="results">' +
+        '<div class="meter">' +
+          '<div class="fill-yes"></div><div class="fill-no"></div><div class="spark"></div>' +
+        '</div>' +
+        '<div class="stats">' +
+          '<span class="pct-yes"></span><span class="pct-no"></span>' +
+        '</div>' +
+        '<div class="meta">' +
+          '<span class="my-vote"></span>' +
+          '<span class="right"><span class="total"></span> · <span class="change-slot"></span></span>' +
+        '</div>' +
+        subHtml +
+      '</div>';
+    container.appendChild(card);
+    cards[p.id] = card;
+
+    card.querySelectorAll(".choices:not(.sub-choices) .btn").forEach(function(btn){
+      btn.addEventListener("click", function(ev){
+        var v = btn.getAttribute("data-vote");
+        burstAt(ev, btn, v === "yes" ? "#35E0C8" : "#FF7A9C");
+        castVote(p, p.id, v);
+        showResults(p, card, true);
+      });
+    });
+
+    if (p.sub){
+      card.querySelectorAll("[data-sub-vote]").forEach(function(btn){
+        btn.addEventListener("click", function(ev){
+          var k = btn.getAttribute("data-sub-vote");
+          burstAt(ev, btn, k === p.sub.a.key ? "#8FD6FF" : "#B48FFF");
+          castVote(p, p.sub.id, k);
+          showSub(p, card, true);
+        });
+      });
+    }
+
+    if (votes[p.id]) showResults(p, card, false);
+  });
+
+  function renderCounts(p){
+    var card = cards[p.id];
+    [["yes", ".c-yes b"], ["no", ".c-no b"]].forEach(function(pair){
+      var el = card.querySelector(pair[1]);
+      var val = countFor(p.id, pair[0]).toLocaleString("en-US");
+      if (el.textContent !== val){
+        el.textContent = val;
+        if (motionOK){
+          var badge = el.parentNode;
+          badge.classList.remove("tick");
+          void badge.offsetWidth;
+          badge.classList.add("tick");
+        }
+      }
+    });
+    if (card.classList.contains("voted") && votes[p.id]) showResults(p, card, false);
+    else if (p.sub && votes[p.sub.id] && card.classList.contains("sub-open")) showSub(p, card, false);
+  }
+  function renderAllCounts(){ POLLS.forEach(renderCounts); }
+
+  /* ---------- Casting a vote (optimistic UI + server sync) ---------- */
+  function castVote(p, pollId, choice){
+    var prev = votes[pollId] ? votes[pollId].v : null;
+    if (prev === choice){ votes[pollId].t = votes[pollId].t || Date.now(); return; }
+    if (prev) bump(pollId, prev, -1);
+    bump(pollId, choice, +1);
+    votes[pollId] = { v: choice, t: Date.now() };
+    saveVotes();
+    if (pollId === p.id) renderCounts(p);
+
+    if (!backendOn) return;
+    sb.from("votes")
+      .upsert({ poll_id: pollId, voter_id: voterId, choice: choice }, { onConflict: "poll_id,voter_id" })
+      .select()
+      .single()
+      .then(function(res){
+        if (res.error){
+          if ((res.error.message || "").indexOf("vote_locked") !== -1){
+            /* server refused: restore previous choice + real lock time */
+            bump(pollId, choice, -1);
+            if (prev) bump(pollId, prev, +1);
+            fetchMine().then(function(){ renderAllCounts(); });
+          }
+          /* network/other errors: keep optimistic state, next sync reconciles */
+          return;
+        }
+        if (res.data && res.data.updated_at){
+          votes[pollId].t = Date.parse(res.data.updated_at) || votes[pollId].t;
+          saveVotes();
+        }
+        fetchCounts();
+      })
+      .catch(function(){ /* offline: reconcile on next sync */ });
+  }
+
+  /* ---------- Server sync ---------- */
+  function fetchCounts(){
+    if (!backendOn) return Promise.resolve();
+    return sb.from("poll_results").select("poll_id, choice, votes").then(function(res){
+      if (res.error || !res.data) return;
+      var fresh = {};
+      res.data.forEach(function(row){
+        if (!fresh[row.poll_id]) fresh[row.poll_id] = {};
+        fresh[row.poll_id][row.choice] = row.votes;
+      });
+      counts = fresh;
+      renderAllCounts();
+    });
+  }
+
+  function fetchMine(){
+    if (!backendOn) return Promise.resolve();
+    return sb.from("votes").select("poll_id, choice, updated_at").eq("voter_id", voterId).then(function(res){
+      if (res.error || !res.data) return;
+      res.data.forEach(function(row){
+        votes[row.poll_id] = { v: row.choice, t: Date.parse(row.updated_at) || 0 };
+      });
+      saveVotes();
+      POLLS.forEach(function(p){
+        if (votes[p.id]) showResults(p, cards[p.id], false);
+      });
+    });
+  }
+
+  if (backendOn){
+    fetchCounts();
+    fetchMine();
+
+    /* live updates: any new/changed vote refreshes the numbers */
+    var rtT = null;
+    try{
+      sb.channel("votes-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, function(){
+          clearTimeout(rtT);
+          rtT = setTimeout(fetchCounts, 400);
+        })
+        .subscribe();
+    }catch(e){ /* realtime unavailable -> the interval below still keeps things fresh */ }
+
+    /* safety net: refresh every 12s while the tab is visible */
+    setInterval(function(){
+      if (document.visibilityState === "visible") fetchCounts();
+    }, 12000);
+  }
+
+  /* ---------- Results ---------- */
+  function showResults(p, card, animate){
+    var my = votes[p.id];
+    if (!my) return;
+    var yes = countFor(p.id, "yes");
+    var no  = countFor(p.id, "no");
+    var total = yes + no;
+    if (total < 1){ yes = my.v === "yes" ? 1 : 0; no = my.v === "no" ? 1 : 0; total = 1; }
+    var pctYes = Math.round((yes / total) * 100);
+    var pctNo  = 100 - pctYes;
+
+    card.classList.add("voted");
+
+    var fy = card.querySelector(".fill-yes");
+    var fn = card.querySelector(".fill-no");
+    var sp = card.querySelector(".meter:not(.sub-meter) .spark");
+
+    function apply(){
+      fy.style.width = pctYes + "%";
+      fn.style.width = pctNo + "%";
+      sp.style.left  = pctYes + "%";
+    }
+    if (animate) {
+      fy.style.width = "0%"; fn.style.width = "0%"; sp.style.left = "50%";
+      requestAnimationFrame(function(){ requestAnimationFrame(apply); });
+    } else {
+      apply();
+    }
+
+    card.querySelector(".pct-yes").textContent = "YES · " + pctYes + "%";
+    card.querySelector(".pct-no").textContent  = pctNo + "% · NO";
+    card.querySelector(".my-vote").innerHTML   = "You voted <strong>" + my.v.toUpperCase() + "</strong>";
+    card.querySelector(".total").textContent   = total.toLocaleString("en-US") + " votes";
+    renderChangeSlot(p, card);
+    updateSub(p, card, animate);
+  }
+
+  /* ---------- Sub-poll (only visible after a YES) ---------- */
+  function updateSub(p, card, animate){
+    if (!p.sub) return;
+    var my = votes[p.id];
+    var open = !!my && my.v === "yes";
+    var wasOpen = card.classList.contains("sub-open");
+    card.classList.toggle("sub-open", open);
+    if (open && votes[p.sub.id]) showSub(p, card, false);
+
+    if (open && !wasOpen && animate){
+      var subEl = card.querySelector(".subpoll");
+      subEl.classList.remove("flash");
+      void subEl.offsetWidth;               // restart the animations
+      subEl.classList.add("flash");
+      clearTimeout(subEl._flashT);
+      subEl._flashT = setTimeout(function(){ subEl.classList.remove("flash"); }, 1700);
+    }
+  }
+
+  function showSub(p, card, animate){
+    var sub = p.sub;
+    var my = votes[sub.id];
+    if (!my) return;
+    var subEl = card.querySelector(".subpoll");
+    subEl.classList.add("sub-voted");
+
+    var a = countFor(sub.id, sub.a.key);
+    var b = countFor(sub.id, sub.b.key);
+    var total = a + b;
+    if (total < 1){ a = my.v === sub.a.key ? 1 : 0; b = my.v === sub.b.key ? 1 : 0; total = 1; }
+    var pctA = Math.round((a / total) * 100);
+    var pctB = 100 - pctA;
+
+    var fa = subEl.querySelector(".fill-a");
+    var fb = subEl.querySelector(".fill-b");
+    var sp = subEl.querySelector(".spark");
+
+    function apply(){
+      fa.style.width = pctA + "%";
+      fb.style.width = pctB + "%";
+      sp.style.left  = pctA + "%";
+    }
+    if (animate) {
+      fa.style.width = "0%"; fb.style.width = "0%"; sp.style.left = "50%";
+      requestAnimationFrame(function(){ requestAnimationFrame(apply); });
+    } else {
+      apply();
+    }
+
+    subEl.querySelector(".pct-a").textContent = sub.a.label + " · " + pctA + "%";
+    subEl.querySelector(".pct-b").textContent = pctB + "% · " + sub.b.label;
+    subEl.querySelector(".sub-my").innerHTML  = "You picked <strong>" + my.v.toUpperCase() + "</strong>";
+    subEl.querySelector(".sub-total").textContent = total.toLocaleString("en-US") + " votes";
+    renderSubChangeSlot(p, card);
+  }
+
+  function renderSubChangeSlot(p, card){
+    var subEl = card.querySelector(".subpoll");
+    var slot = subEl.querySelector(".sub-change-slot");
+    var left = msLeftFor(p.sub.id);
+    if (left > 0){
+      slot.innerHTML = '<span class="lock" title="You can change your vote 15 seconds after voting">Change in <span class="cd">' + fmt(left) + '</span></span>';
+    } else {
+      slot.innerHTML = '<button class="change" type="button">Change vote</button>';
+      slot.querySelector(".change").addEventListener("click", function(){
+        subEl.classList.remove("sub-voted");
+      });
+    }
+  }
+
+  /* ---------- 15-second change lock ---------- */
+  function msLeftFor(id){
+    var my = votes[id];
+    if (!my) return 0;
+    return Math.max(0, (my.t + CHANGE_LOCK_MS) - Date.now());
+  }
+
+  function fmt(ms){
+    var s = Math.ceil(ms / 1000);
+    var m = Math.floor(s / 60);
+    s = s % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function renderChangeSlot(p, card){
+    var slot = card.querySelector(".change-slot");
+    var left = msLeftFor(p.id);
+    if (left > 0){
+      slot.innerHTML = '<span class="lock" title="You can change your vote 15 seconds after voting">Change in <span class="cd">' + fmt(left) + '</span></span>';
+    } else {
+      slot.innerHTML = '<button class="change" type="button">Change vote</button>';
+      slot.querySelector(".change").addEventListener("click", function(){
+        card.classList.remove("voted");
+      });
+    }
+  }
+
+  function tickSlot(slot, id, rerender){
+    var left = msLeftFor(id);
+    var cd = slot.querySelector(".cd");
+    if (left > 0){
+      if (cd) cd.textContent = fmt(left);
+      else rerender();
+    } else if (cd){
+      rerender();   // unlock
+    }
+  }
+
+  setInterval(function(){
+    POLLS.forEach(function(p){
+      var card = cards[p.id];
+      if (!card.classList.contains("voted") || !votes[p.id]) return;
+      tickSlot(card.querySelector(".change-slot"), p.id, function(){ renderChangeSlot(p, card); });
+      if (p.sub && card.classList.contains("sub-open") && votes[p.sub.id]){
+        tickSlot(card.querySelector(".sub-change-slot"), p.sub.id, function(){ renderSubChangeSlot(p, card); });
+      }
+    });
+  }, 1000);
+
+  /* ---------- Cookie banner ---------- */
+  var banner = document.getElementById("cookieBanner");
+  if (!consent) banner.classList.add("show");
+
+  document.getElementById("cookieAccept").addEventListener("click", function(){
+    consent = "accepted";
+    lsSet(LS_CONSENT, "accepted");
+    lsSet(LS_VOTER, voterId);
+    saveVotes();
+    banner.classList.remove("show");
+  });
+  document.getElementById("cookieDecline").addEventListener("click", function(){
+    consent = "declined";
+    ssSet(LS_CONSENT, "declined"); // remembered for this session only
+    banner.classList.remove("show");
+  });
+})();
+</script>
+</body>
+</html>
