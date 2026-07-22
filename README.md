@@ -34,12 +34,6 @@ The complete database rules are public too: see [`supabase.sql`](supabase.sql).
 Static HTML/CSS/JS (no build step) · [Supabase](https://supabase.com)
 (Postgres + Realtime) · GitHub Pages.
 
-## Run your own
-
-1. Fork this repo and enable GitHub Pages.
-2. Create a free Supabase project and run `supabase.sql` in the SQL Editor.
-3. Paste your project URL and anon key into the `CONFIG` block at the top of
-   the script in `index.html`.
 
 ## License
 
