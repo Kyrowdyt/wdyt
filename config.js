@@ -10,6 +10,6 @@
    key or the database password anywhere in this repository.)
    ============================================================ */
 window.WDYT_CONFIG = {
-  SUPABASE_URL:      "PASTE_SUPABASE_URL_HERE",
-  SUPABASE_ANON_KEY: "PASTE_SUPABASE_ANON_KEY_HERE"
+  SUPABASE_URL:      "https://aoawsihkdonrwfkgcmyk.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvYXdzaWhrZG9ucndma2djbXlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTU1NDIsImV4cCI6MjEwMDI5MTU0Mn0.vZeQs1EpQUpkCHFSl0Zw1fWU8z1XeB4uEKpLS2Fo1-w"
 };
