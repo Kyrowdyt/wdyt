@@ -170,19 +170,6 @@
     font-weight:500; line-height:1.35;
   }
 
-  /* Live vote counters next to the question */
-  .counts{ display:flex; flex-direction:column; gap:5px; align-items:flex-end; margin-left:4px; }
-  .counts span{
-    font-size:.74rem; font-weight:700; letter-spacing:.05em;
-    padding:4px 9px; border-radius:99px; white-space:nowrap;
-    font-variant-numeric:tabular-nums;
-    border:1px solid;
-  }
-  .c-yes{ color:var(--yes); border-color:rgba(53,224,200,.35); background:rgba(53,224,200,.08); }
-  .c-no { color:var(--no);  border-color:rgba(255,122,156,.35); background:rgba(255,122,156,.08); }
-  .counts span.tick{ animation:countTick .45s ease; }
-  @keyframes countTick{ 30%{ transform:scale(1.16); } }
-
   .choices{ display:flex; gap:10px; margin-top:14px; }
   .btn{
     flex:1;
@@ -357,7 +344,6 @@
     .hero{ margin-top:9vh; }
     body.pinned .hero{ margin-top:0; }
     .thumb{ border-radius:13px; }
-    .counts span{ font-size:.66rem; padding:3px 7px; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -686,10 +672,6 @@
           '<img src="' + p.img + '" alt="' + p.ticker + ' thumbnail">' +
         '</div>' +
         '<div class="q"><h2>' + p.question + '</h2></div>' +
-        '<div class="counts">' +
-          '<span class="c-yes">YES <b>0</b></span>' +
-          '<span class="c-no">NO <b>0</b></span>' +
-        '</div>' +
       '</div>' +
       '<div class="choices">' +
         '<button class="btn yes" data-vote="yes">YES</button>' +
@@ -734,21 +716,9 @@
     if (votes[p.id]) showResults(p, card, false);
   });
 
+  /* Live refresh of any open results when counts change */
   function renderCounts(p){
     var card = cards[p.id];
-    [["yes", ".c-yes b"], ["no", ".c-no b"]].forEach(function(pair){
-      var el = card.querySelector(pair[1]);
-      var val = countFor(p.id, pair[0]).toLocaleString("en-US");
-      if (el.textContent !== val){
-        el.textContent = val;
-        if (motionOK){
-          var badge = el.parentNode;
-          badge.classList.remove("tick");
-          void badge.offsetWidth;
-          badge.classList.add("tick");
-        }
-      }
-    });
     if (card.classList.contains("voted") && votes[p.id]) showResults(p, card, false);
     else if (p.sub && votes[p.sub.id] && card.classList.contains("sub-open")) showSub(p, card, false);
   }
